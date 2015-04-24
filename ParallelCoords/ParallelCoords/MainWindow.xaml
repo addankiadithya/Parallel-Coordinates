@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Parallel Coordinate Chart(v 1.0) © Adithya Addanki" Height="756.343" 
         Width="1077.167" Name="pcPlot" Icon="images.ico" Closing="closingCheck" Closed="closedWindow" 
-        ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen" PreviewKeyDown="clearBrush">
     <Grid Background="LightBlue">
         <Menu HorizontalAlignment="Left" Height="21" VerticalAlignment="Top" Width="1070">
             <MenuItem Header="File" Click="loadFile"/>

@@ -46,7 +46,12 @@ namespace ParallelCoords
         int decisionSel ;
         LinkedList<String> selattrs= new LinkedList<string>();
         static int nmtimes = 0;
-
+        String brushedAV = "";
+        int brushedRowCount = 0;
+        int globMinAttr = 0;
+        int globMaxAttr = 6;
+        String globdecAttr;
+        EnumerableRowCollection<DataRow> selr;
         // Axes for Parallel Coordinates
         public MainWindow()
         {
@@ -84,6 +89,17 @@ namespace ParallelCoords
             w.Focus();
             w.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             w.ShowDialog();
+        }
+
+        private void clearBrush(object sender, KeyEventArgs se)
+        {
+            if (se.Key == Key.Escape)
+            {
+                brushedAV = "";
+                selr = null;
+                brushedRowCount = 0;
+                userSel.Children.Clear();
+            }
         }
 
         // Preferences for the Import: set delimeter and header content
@@ -124,6 +140,7 @@ namespace ParallelCoords
             bx.Items.Add(comma);
             bx.Items.Add(semicol);
             bx.Items.Add(col);
+            RegisterName("delimSel",bx);
             Button ok = new Button();
             String sel = "";
             bx.SelectionChanged += (s, se) =>
@@ -138,6 +155,7 @@ namespace ParallelCoords
             p.Children.Add(cb);            
             p.Children.Add(delim);
             p.Children.Add(bx);
+            p.Children.Add(ok);
             p.VerticalAlignment = VerticalAlignment.Center;
             p.HorizontalAlignment = HorizontalAlignment.Center;
             w.Content = p;
@@ -167,7 +185,8 @@ namespace ParallelCoords
 
         void ok_Click(object sender, RoutedEventArgs e)
         {
-            
+            ComboBox cb = (ComboBox)FindName("delimSel");
+            MessageBox.Show(cb.SelectionBoxItem.ToString());
         }
 
         // Display help information regarding how to use the application
@@ -186,7 +205,9 @@ namespace ParallelCoords
                 + "\t If the #attributes is greater than 6\n"
                 + "\t\t Provision for user to select a decision variable\n"
                 + "\t\t Slider to move through the chart, with decision variable fixed\n"
-                + "3. The lower frame is more customizable\n"
+                + "3. The user can filter the plotted graph\n"
+                + "\t Click on an axis of interest, the brushed graph is drawn frame 2\n"
+                + "4. The lower frame is more customizable\n"
                 + "\t Allows upto 6 attributes[Attributes of interest]\n"
                 + "\t Weka Logs could be loaded[Selects top 6 attributes]\n"
                 +"\n\n**Preferences have not been incorporated yet.";
@@ -424,72 +445,94 @@ namespace ParallelCoords
         // Once the preview closes, loads the datagrid into the parallel coordinates
         void w_Closed(object sender, EventArgs e)
         {
-            invisiAxes(0);
-            nmtimes++;
-            if (nmtimes > 1)
+            try
             {
-                ComboBox cb1 = (ComboBox)attrDDC.FindName("Preview");
-                ComboBox cb2 = (ComboBox)attrDDC.FindName("select");
-                cb1.Items.Clear();
-                cb2.Items.Clear();
-                UnregisterName("select");
-                UnregisterName("Preview");
-                UnregisterName("Weka");
-                UnregisterName("DrawPlot");
+                invisiAxes(0);
+                nmtimes++;
+                if (nmtimes > 1)
+                {
+                    ComboBox cb1 = (ComboBox)attrDDC.FindName("Preview");
+                    ComboBox cb2 = (ComboBox)attrDDC.FindName("select");
+                    cb1.Items.Clear();
+                    cb2.Items.Clear();
+                    UnregisterName("select");
+                    UnregisterName("Preview");
+                    UnregisterName("Weka");
+                    UnregisterName("DrawPlot");
+                }
+                selattrs.Clear();
+                attrDisVal.Clear();
+                ptCoord.Clear();
+                pcoord.Children.Clear();
+                decAttr.Children.Clear();
+                userSel.Children.Clear();
+                attrDDC.Children.Clear();
+                brushedAV = "";
+                selr = null;
+                userSel.Children.Clear();
+                brushedRowCount = 0;
+                globMinAttr = 0;
+                globMaxAttr = 6;
+                globdecAttr = "";
+                int i = 0;
+                int cols = t.Columns.Count;
+                sli = new ScrollBar();
+                sli.Name = "slider";
+                sli.Margin = new Thickness(18, 320, 0, 0);
+                sli.Orientation = Orientation.Horizontal;
+                sli.SmallChange = 1;
+                sli.Scroll += slider_ValueChanged;
+                sli.Height = 15;
+                sli.Width = 700;
+                sli.Visibility = (cols < 6 ? Visibility.Hidden : Visibility.Visible);
+                sli.Minimum = 0;
+                sli.Maximum = (cols / 6) - 1;
+                int rem = cols % 6;
+                if (rem > 0)
+                    sli.Maximum += 1;
+
+                checkDecisionAttr();
+                initTable();
+                initPlotPoints();
+
+                pcoord.Children.Add(sli);
+                globMinAttr = 0;
+                globMaxAttr = (cols < 6 ? cols : 6);
+                drawPlot(globMinAttr, globMaxAttr);
+                while (i < (cols < 6 ? cols : 6))
+                {
+                    drawAxes(i, i);
+                    i++;
+                }
+                if (cols > 6)
+                {
+                    drawAxes(i, decisionSel);
+                    String temp = t.Columns[decisionSel].ColumnName; ;
+                    Label Attr1 = new Label();
+                    Attr1.Margin = new Thickness(850, 275, 0, 0);
+                    Attr1.Visibility = Visibility.Visible;
+                    Attr1.Content = temp;
+                    Attr1.ToolTip = getDisVals(attrDisVal[temp]);
+                    pcoord.Children.Add(Attr1);
+                }
+                header1 = new Label();
+                header1.Margin = new Thickness(100, 295, 0, 0);
+                header1.Content = "Parallel Coordinates : " + fname;
+                header1.FontFamily = new FontFamily("Times New Roman");
+                header1.FontWeight = FontWeights.Bold;
+                header1.FontSize = 15;
+                header1.Foreground = new SolidColorBrush(Colors.Blue);
+                pcoord.Children.Add(header1);
+                loadSecondCanvas();
             }
-            selattrs.Clear();
-            attrDisVal.Clear();
-            ptCoord.Clear();
-            pcoord.Children.Clear();
-            decAttr.Children.Clear();
-            userSel.Children.Clear();
-            attrDDC.Children.Clear();
-            int i = 0;
-            int cols = t.Columns.Count;
-            sli = new ScrollBar();
-            sli.Name = "slider";
-            sli.Margin = new Thickness(18, 320, 0, 0);
-            sli.Orientation = Orientation.Horizontal;
-            sli.SmallChange = 1;
-            sli.Scroll += slider_ValueChanged;
-            sli.Height = 15;
-            sli.Width = 700;
-            sli.Visibility = (cols < 6 ? Visibility.Hidden : Visibility.Visible);
-            sli.Minimum = 0;
-            sli.Maximum = (cols / 6)-1;
-            int rem = cols % 6;
-            if (rem > 0)
-                sli.Maximum += 1;
-            while (i < (cols < 6 ? cols : 6))
+            catch(Exception)
             {
-                drawAxes(i,i);
-                i++;
+                MessageBox.Show("Error Reading File\nPlease check the delimeter settings in 'Preferences'");
+                userSel.Children.Clear();
+                attrDDC.Children.Clear();
+                pcoord.Children.Clear();
+                decAttr.Children.Clear();
             }
-            checkDecisionAttr();
-            initTable();
-            initPlotPoints();
-            if (cols > 6)
-            {
-                drawAxes(i, decisionSel);
-                String temp=t.Columns[decisionSel].ColumnName;;
-                Label Attr1 = new Label();
-                Attr1.Margin = new Thickness(850,275,0,0);
-                Attr1.Visibility = Visibility.Visible;
-                Attr1.Content = temp;
-                Attr1.ToolTip = getDisVals(attrDisVal[temp]);
-                pcoord.Children.Add(Attr1);
-            }
-            pcoord.Children.Add(sli);
-            drawPlot(0, (cols < 6 ? cols : 6));
-            header1 = new Label();
-            header1.Margin = new Thickness(100, 295, 0, 0);
-            header1.Content = "Parallel Coordinates : " + fname;
-            header1.FontFamily = new FontFamily("Times New Roman");
-            header1.FontWeight = FontWeights.Bold;
-            header1.FontSize = 15;
-            header1.Foreground = new SolidColorBrush(Colors.Blue);
-            pcoord.Children.Add(header1);
-            loadSecondCanvas();
         }
 
 
@@ -594,6 +637,7 @@ namespace ParallelCoords
                 cb1.Items.Remove(cbi);
                 cb.Items.Add(cbi);
             }
+            userSel.Children.Clear();
         }
 
         // File dialog for Weka Log file load
@@ -758,7 +802,7 @@ namespace ParallelCoords
                     arcPath.X2 = i * 140 + 20;
                     arcPath.Y2 = 270;
                     arcPath.Stroke = new SolidColorBrush(Colors.Red);
-                    arcPath.StrokeThickness = 1;
+                    arcPath.StrokeThickness = 7;
                     arcPath.Fill = new SolidColorBrush(Colors.Yellow);
                     arcPath.Name = "axis" + i;
                     arcPath.HorizontalAlignment = HorizontalAlignment.Center;
@@ -841,6 +885,7 @@ namespace ParallelCoords
                     MessageBox.Show("Please add only 6 attributes at once","Caution");
                 }
             }
+            userSel.Children.Clear();
         }
 
         // loads the decision vars when the #attributes is >6
@@ -856,7 +901,8 @@ namespace ParallelCoords
                 ao.FontWeight = FontWeights.Bold;
                 ao.FontSize = 15;
                 ao.Foreground = new SolidColorBrush(Colors.Blue);
-                String name = t.Columns[--cols].ColumnName; 
+                String name = t.Columns[--cols].ColumnName;
+                globdecAttr = name;
                 ao.Margin = new Thickness(10,10,0,0);
                 decAttr.Children.Add(ao);
                 RadioButton rb1 = new RadioButton();
@@ -901,6 +947,8 @@ namespace ParallelCoords
         // redraw the plot when the decision var is changed
         void rb_Checked(object sender, RoutedEventArgs e)
         {
+            userSel.Children.Clear();
+            brushedAV = "";
             RadioButton rb1= sender as RadioButton;
             if (rb1.IsChecked??false )
             {
@@ -913,6 +961,10 @@ namespace ParallelCoords
                 int max = ((intCoordInd + 1) * 6);
                 max = max > t.Columns.Count ? t.Columns.Count : max;
                 int i = 0, j = min;
+                
+                globMinAttr = min;
+                globMaxAttr = max;
+                drawPlot(min, max);
                 while (i < ((max / 6) > 0 ? 6 : max % 6))
                 {
                     drawAxes(i, j++);
@@ -928,8 +980,8 @@ namespace ParallelCoords
                     Attr1.Content = temp;
                     Attr1.ToolTip = getDisVals(attrDisVal[temp]);
                     pcoord.Children.Add(Attr1);
+                    globdecAttr = temp;
                 }
-                drawPlot(min, max);
                 //MessageBox.Show(""+decisionSel);
             }
         }
@@ -945,15 +997,114 @@ namespace ParallelCoords
                 arcPath.X2 = i * 140 + 20;
                 arcPath.Y2 = 270;
                 arcPath.Stroke = new SolidColorBrush(Colors.Red);
-                arcPath.StrokeThickness = 1;
+                arcPath.StrokeThickness = 7;
                 arcPath.Fill = new SolidColorBrush(Colors.Yellow);
                 arcPath.Name = "axis" + i;
                 arcPath.HorizontalAlignment = HorizontalAlignment.Center;
                 arcPath.ToolTip = "Axis|Dimension: " + t.Columns[j].ColumnName;
+                Nullable<Point> dragStart = null;
+                Nullable<Point> dragEnd = null;
+                arcPath.MouseLeftButtonDown += (sender, args) =>
+                {
+                    var element = (UIElement)sender;
+                    dragStart = args.GetPosition(element);
+                    element.CaptureMouse();
+                };
+                arcPath.MouseLeftButtonUp += (sender, args) =>
+                {
+                    var element = (UIElement)sender;
+                    dragEnd = args.GetPosition(element);
+                    if (dragStart != null )
+                    {
+                        //MessageBox.Show("Attribute:" + t.Columns[j].ColumnName+ ":" + dragStart + ":" + dragEnd);
+                        brushed(t.Columns[j].ColumnName, dragStart, dragEnd);
+                    }
+                };                
                 pcoord.Children.Add(arcPath);
             }
         }
 
+        private void brushed(String colname, Nullable<Point> ds, Nullable<Point> de)
+        {
+            try
+            {
+                string attrVal = "";
+                brushedAV = "";
+                selr = null;
+                brushedRowCount = 0;
+                userSel.Children.Clear();
+                if (de != null)
+                {
+                    Point s = ds ?? new Point(0, 0);
+                    Point p = de ?? new Point(0, 0);
+                    if (p.X != 0 && p.Y != 0 && s.X != 0 && s.Y != 0)
+                    {
+                        foreach (string tmp in attrDisVal[colname])
+                        {
+                            //MessageBox.Show(ptCoord[colname + ":" + tmp]+"");
+                            if (ptCoord[colname + ":" + tmp] > (p.Y - 5) && ptCoord[colname + ":" + tmp] < (p.Y + 5))
+                            {
+                                attrVal = tmp;
+                                break;
+                            }
+                        }
+                        if (!attrVal.Equals(""))
+                        {
+                            userSel.Children.Clear();
+                            brushedAV += colname + ":" + attrVal + "  |  ";
+                            //MessageBox.Show(brushedAV);
+                            drawBrushedPlot(brushedAV);
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Something went wrong.. Please try again");
+                userSel.Children.Clear();
+                brushedAV = "";
+                selr = null;
+                brushedRowCount = 0;
+            }
+        }
+
+        private void drawBrushedPlot(String bAV)
+        {
+            brushedRowCount = 0;
+            if (!bAV.Equals(""))
+            {
+                string[] avPairs = bAV.Split(new char[]{'|'});
+                foreach (string av in avPairs)
+                {
+                    if (!av.Trim().Equals(""))
+                    {
+                        string[] cv = av.Trim().Split(new char[]{':'});
+                        if (cv.Length == 2)
+                        {
+                            if (selr==null)
+                            {
+                                var selRows = from sr in t.AsEnumerable()
+                                              where sr.Field<String>(cv[0]) == cv[1]
+                                              select sr;
+                                selr = selRows;
+                                brushedRowCount += selRows.Count();
+                                drawSelected(globMinAttr, globMaxAttr, selRows);
+                            }
+                            else
+                            {
+                                var selRows = from sr in selr
+                                              where sr.Field<String>(cv[0]) == cv[1]
+                                              select sr;
+                                selr = selRows;
+                                brushedRowCount += selRows.Count();
+                                drawSelected(globMinAttr, globMaxAttr, selRows);
+                            }
+                        }                         
+                    }
+                }
+                //MessageBox.Show("Select number of rows: "+brushedRowCount);
+            }
+        }
         // Tooltip to display the distinct values on the axis label
         private String getDisVals(SortedSet<string> temp)
         {
@@ -1087,6 +1238,26 @@ namespace ParallelCoords
             }
         }
 
+        //drawAxes for Brushed Plot
+        private void drawAxesBrushed(int i, int j)
+        {
+            if (j < t.Columns.Count)
+            {
+                Line arcPath = new Line();
+                arcPath.X1 = i * 140 + 20;
+                arcPath.Y1 = 20;
+                arcPath.X2 = i * 140 + 20;
+                arcPath.Y2 = 270;
+                arcPath.Stroke = new SolidColorBrush(Colors.Red);
+                arcPath.StrokeThickness = 4;
+                arcPath.Fill = new SolidColorBrush(Colors.Yellow);
+                arcPath.Name = "axis" + i;
+                arcPath.HorizontalAlignment = HorizontalAlignment.Center;
+                arcPath.ToolTip = "Axis|Dimension: " + t.Columns[j].ColumnName;
+                userSel.Children.Add(arcPath);
+            }
+        }
+
         // Clears the canvas
         private void invisiAxes(double sliVal)
         {
@@ -1157,6 +1328,101 @@ namespace ParallelCoords
                     r++;
                 }
                 c++;
+            }
+        }
+
+        // Draws the plot on the canvas
+        private void drawSelected(int attrInd, int attrmax,EnumerableRowCollection<DataRow> st)
+        {
+            try
+            {
+                if (st.Count() > 0)
+                {
+                    int r = 0, c = attrInd;
+                    int cols = t.Columns.Count;
+                    String col1 = "";
+                    String col2 = "";
+
+                    int i1 = 0, j1 = attrInd;
+                    
+
+                    for (int i = attrInd, j = 0; i < attrmax; i++)
+                        visiAxes(j++, c++, 0, userSel, "");
+                    foreach (DataRow dr in st)
+                    {
+                        c = attrInd;
+                        int k = 0;
+                        for (; c < (attrmax) - 1; )
+                        {
+                            String stpt = dr[c].ToString();
+                            col1 = t.Columns[c].ColumnName;
+                            String key1 = col1 + ":" + stpt;
+                            Line arcPath = new Line();
+                            arcPath.X1 = k * 140 + 20;
+                            arcPath.Y1 = ptCoord[key1];
+                            col2 = t.Columns[c + 1].ColumnName;
+                            String endpt = dr[c + 1].ToString();
+                            String key2 = col2 + ":" + endpt;
+                            arcPath.X2 = (k + 1) * 140 + 20;
+                            arcPath.Y2 = ptCoord[key2];
+                            arcPath.Stroke = new SolidColorBrush(Colors.Blue);
+                            arcPath.StrokeThickness = 1;
+                            arcPath.Fill = new SolidColorBrush(Colors.Blue);
+                            arcPath.HorizontalAlignment = HorizontalAlignment.Center;
+                            arcPath.ToolTip = key1 + "---" + key2;
+                            userSel.Children.Add(arcPath);
+                            c++;
+                            k++;
+                        }
+                        if (attrmax < cols)
+                        {
+                            String stpt = dr[c].ToString();
+                            col1 = t.Columns[c].ColumnName;
+                            String key1 = col1 + ":" + stpt;
+                            Line arcPath = new Line();
+                            arcPath.X1 = (k) * 140 + 20;
+                            arcPath.Y1 = ptCoord[key1];
+                            col2 = t.Columns[globdecAttr].ColumnName;
+                            String endpt = dr[decisionSel].ToString();
+                            String key2 = col2 + ":" + endpt;
+                            arcPath.X2 = (k + 1) * 140 + 20;
+                            arcPath.Y2 = ptCoord[key2];
+                            arcPath.Stroke = new SolidColorBrush(Colors.Blue);
+                            arcPath.StrokeThickness = 1;
+                            arcPath.Fill = new SolidColorBrush(Colors.Blue);
+                            arcPath.HorizontalAlignment = HorizontalAlignment.Center;
+                            arcPath.ToolTip = key1 + "---" + key2;
+                            userSel.Children.Add(arcPath);
+                        }
+                        r++;
+                        c = 0;
+                    }
+                    while (i1 < ((attrmax / 6) > 0 ? 6 : attrmax % 6))
+                    {
+                        drawAxesBrushed(i1, j1++);
+                        i1++;
+                    }
+
+                    if (cols > 6 && attrmax < cols)
+                    {
+                        drawAxesBrushed(i1, decisionSel);
+                        String temp = t.Columns[decisionSel].ColumnName; ;
+                        Label Attr1 = new Label();
+                        Attr1.Margin = new Thickness(850, 275, 0, 0);
+                        Attr1.Visibility = Visibility.Visible;
+                        Attr1.Content = temp;
+                        Attr1.ToolTip = getDisVals(attrDisVal[temp]);
+                        userSel.Children.Add(Attr1);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Unable to plot the values", "Caution");
+                //pcoord.Children.Clear();
+                userSel.Children.Clear();
+                //attrDDC.Children.Clear();
+                //decAttr.Children.Clear();
             }
         }
 
@@ -1244,9 +1510,11 @@ namespace ParallelCoords
             int max=((intCoordInd+1)*6);
             max=max>t.Columns.Count?t.Columns.Count:max;
             int i = 0, j = min ;
-            while (i < ((max/6)>0?6:max%6))
+            
+            drawPlot(min,max);
+            while (i < ((max / 6) > 0 ? 6 : max % 6))
             {
-                drawAxes(i,j++);
+                drawAxes(i, j++);
                 i++;
             }
             if (max < t.Columns.Count)
@@ -1260,7 +1528,13 @@ namespace ParallelCoords
                 Attr1.ToolTip = getDisVals(attrDisVal[temp]);
                 pcoord.Children.Add(Attr1);
             }
-            drawPlot(min,max);
+            globMinAttr = min;
+            globMaxAttr = max;
+            if(!brushedAV.Equals(""))
+            {
+                userSel.Children.Clear();
+                drawBrushedPlot(brushedAV);
+            }
         }
     }
 }
