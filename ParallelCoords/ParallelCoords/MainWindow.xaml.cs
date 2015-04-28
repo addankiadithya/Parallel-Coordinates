@@ -146,8 +146,8 @@ namespace ParallelCoords
             bx.SelectionChanged += (s, se) =>
                                     {
                                         ComboBox x = s as ComboBox;
-                                        sel=x.SelectedValue.ToString();
-                                        delimeter=sel.Substring(sel.Length-2);
+                                        //sel=x.SelectedValue.ToString();
+                                        //delimeter=sel.Substring(sel.Length-2);
                                     };
             ok.Content = "Apply";
             ok.Click += ok_Click;
@@ -185,8 +185,18 @@ namespace ParallelCoords
 
         void ok_Click(object sender, RoutedEventArgs e)
         {
-            ComboBox cb = (ComboBox)FindName("delimSel");
-            MessageBox.Show(cb.SelectionBoxItem.ToString());
+            String sel="";
+            ComboBox c = (ComboBox)FindName("delimSel");
+            if (c.SelectedValue != null)
+            {
+                sel = c.SelectedValue.ToString();
+
+                if (sel != "")
+                    delimeter = sel.Substring(sel.Length - 2);
+                else
+                    delimeter = ",";
+                //MessageBox.Show(cb.SelectionBoxItem.ToString());
+            }
         }
 
         // Display help information regarding how to use the application
@@ -1035,14 +1045,14 @@ namespace ParallelCoords
                 userSel.Children.Clear();
                 if (de != null)
                 {
-                    Point s = ds ?? new Point(0, 0);
+                    //Point s = ds ?? new Point(0, 0);
                     Point p = de ?? new Point(0, 0);
-                    if (p.X != 0 && p.Y != 0 && s.X != 0 && s.Y != 0)
+                    if (p.X != 0 && p.Y != 0 )//&& s.X != 0 && s.Y != 0)
                     {
                         foreach (string tmp in attrDisVal[colname])
                         {
                             //MessageBox.Show(ptCoord[colname + ":" + tmp]+"");
-                            if (ptCoord[colname + ":" + tmp] > (p.Y - 5) && ptCoord[colname + ":" + tmp] < (p.Y + 5))
+                            if (ptCoord[colname + ":" + tmp] > (p.Y - 10) && ptCoord[colname + ":" + tmp] < (p.Y + 10))
                             {
                                 attrVal = tmp;
                                 break;
@@ -1051,8 +1061,8 @@ namespace ParallelCoords
                         if (!attrVal.Equals(""))
                         {
                             userSel.Children.Clear();
-                            brushedAV += colname + ":" + attrVal + "  |  ";
-                            //MessageBox.Show(brushedAV);
+                            brushedAV += colname + ":" + attrVal;
+                            MessageBox.Show(brushedAV);
                             drawBrushedPlot(brushedAV);
                         }
                     }
@@ -1063,7 +1073,7 @@ namespace ParallelCoords
                 MessageBox.Show("Something went wrong.. Please try again");
                 userSel.Children.Clear();
                 brushedAV = "";
-                selr = null;
+                //selr = null;
                 brushedRowCount = 0;
             }
         }
@@ -1102,6 +1112,7 @@ namespace ParallelCoords
                         }                         
                     }
                 }
+                //brushedAV = "";
                 //MessageBox.Show("Select number of rows: "+brushedRowCount);
             }
         }
